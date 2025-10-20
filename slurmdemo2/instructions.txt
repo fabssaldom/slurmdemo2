@@ -1,0 +1,33 @@
+Advanced Deployment Instructions
+================================
+
+Terraform group 'networkstorage' was successfully created in directory slurmdemo2/networkstorage
+To deploy, run the following commands:
+
+terraform -chdir=slurmdemo2/networkstorage init
+terraform -chdir=slurmdemo2/networkstorage validate
+terraform -chdir=slurmdemo2/networkstorage apply
+gcluster export-outputs slurmdemo2/networkstorage
+
+Terraform group 'slurm-cluster' was successfully created in directory slurmdemo2/slurm-cluster
+To deploy, run the following commands:
+
+gcluster import-inputs slurmdemo2/slurm-cluster
+terraform -chdir=slurmdemo2/slurm-cluster init
+terraform -chdir=slurmdemo2/slurm-cluster validate
+terraform -chdir=slurmdemo2/slurm-cluster apply
+
+Destroying infrastructure when no longer needed
+===============================================
+
+Automated
+---------
+
+gcluster destroy slurmdemo2
+
+Advanced / Manual
+-----------------
+Infrastructure should be destroyed in reverse order of creation:
+
+terraform -chdir=slurmdemo2/slurm-cluster destroy
+terraform -chdir=slurmdemo2/networkstorage destroy

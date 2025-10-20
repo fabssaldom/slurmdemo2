@@ -15,15 +15,15 @@
 # Edited by: <fsalaman@google.com>
 
 ---
-blueprint_name: slurmdemo1
+blueprint_name: slurmdemo2
 
 vars:
-  project_id: slurmdemo1 ## Set GCP Project ID Here ##
-  deployment_name: slurmdemo1
+  project_id: slurmdemo2 ## Set GCP Project ID Here ##
+  deployment_name: slurmdemo2
   region: us-west1
   zone: us-west1-a
   compute_node_machine_type: n2-standard-2
-  network_name: slurm-demo-vpc
+  network_name: slurm-demo-vpc2
   #subnetwork_name: slurm-demo-vpc-sn1
   #hpc_instance_id: toolkit-hpc-instance
 

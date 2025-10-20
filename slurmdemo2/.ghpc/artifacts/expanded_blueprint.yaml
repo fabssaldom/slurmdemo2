@@ -1,0 +1,169 @@
+# Copyright 2023 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+blueprint_name: slurmdemo2
+ghpc_version: v1.67.0-0-g18d5dc567
+vars:
+  compute_node_machine_type: n2-standard-2
+  deployment_name: slurmdemo2
+  labels:
+    ghpc_blueprint: slurmdemo2
+    ghpc_deployment: ((var.deployment_name))
+  network_name: slurm-demo-vpc2
+  project_id: slurmdemo2
+  region: us-west1
+  zone: us-west1-a
+deployment_groups:
+  - group: networkstorage
+    terraform_providers:
+      google:
+        source: hashicorp/google
+        version: '>= 6.9.0, <= 7.2.0'
+        configuration:
+          project: ((var.project_id))
+          region: ((var.region))
+          zone: ((var.zone))
+      google-beta:
+        source: hashicorp/google-beta
+        version: '>= 6.9.0, <= 7.2.0'
+        configuration:
+          project: ((var.project_id))
+          region: ((var.region))
+          zone: ((var.zone))
+    modules:
+      - source: modules/network/vpc
+        kind: terraform
+        id: network
+        outputs:
+          - name: subnetwork_self_link
+            description: Automatically-generated output exported for use by later deployment groups
+            sensitive: true
+        settings:
+          deployment_name: ((var.deployment_name))
+          labels: ((var.labels))
+          network_name: ((var.network_name))
+          project_id: ((var.project_id))
+          region: ((var.region))
+      - source: community/modules/network/private-service-access
+        kind: terraform
+        id: private_service_access
+        use:
+          - network
+        settings:
+          labels: ((var.labels))
+          network_id: ((module.network.network_id))
+          project_id: ((var.project_id))
+      - source: modules/file-system/filestore
+        kind: terraform
+        id: sharedstg
+        use:
+          - network
+          - private_service_access
+        outputs:
+          - name: network_storage
+            description: Automatically-generated output exported for use by later deployment groups
+            sensitive: true
+        settings:
+          connect_mode: ((module.private_service_access.connect_mode))
+          deployment_name: ((var.deployment_name))
+          filestore_tier: ZONAL
+          labels: ((var.labels))
+          local_mount: /shared
+          network_id: ((module.network.network_id))
+          project_id: ((var.project_id))
+          region: ((var.region))
+          reserved_ip_range: ((module.private_service_access.reserved_ip_range))
+          size_gb: 1024
+          zone: ((var.zone))
+  - group: slurm-cluster
+    terraform_providers:
+      google:
+        source: hashicorp/google
+        version: '>= 6.9.0, <= 7.2.0'
+        configuration:
+          project: ((var.project_id))
+          region: ((var.region))
+          zone: ((var.zone))
+      google-beta:
+        source: hashicorp/google-beta
+        version: '>= 6.9.0, <= 7.2.0'
+        configuration:
+          project: ((var.project_id))
+          region: ((var.region))
+          zone: ((var.zone))
+    modules:
+      - source: community/modules/compute/schedmd-slurm-gcp-v6-nodeset
+        kind: terraform
+        id: hpc-nodeset
+        use:
+          - network
+          - sharedstg
+        settings:
+          allow_automatic_updates: false
+          bandwidth_tier: gvnic_enabled
+          labels: ((var.labels))
+          machine_type: ((var.compute_node_machine_type))
+          name: hpc-nodeset
+          network_storage: ((flatten([module.sharedstg.network_storage])))
+          node_count_dynamic_max: 3
+          project_id: ((var.project_id))
+          region: ((var.region))
+          subnetwork_self_link: ((module.network.subnetwork_self_link))
+          zone: ((var.zone))
+      - source: community/modules/compute/schedmd-slurm-gcp-v6-partition
+        kind: terraform
+        id: hpc_partition
+        use:
+          - hpc-nodeset
+        settings:
+          is_default: true
+          nodeset: ((flatten([module.hpc-nodeset.nodeset])))
+          partition_name: hpcpartition
+      - source: community/modules/scheduler/schedmd-slurm-gcp-v6-login
+        kind: terraform
+        id: slurm_login
+        use:
+          - network
+        settings:
+          enable_login_public_ips: false
+          labels: ((var.labels))
+          machine_type: n2-standard-4
+          name_prefix: slurm_login
+          project_id: ((var.project_id))
+          region: ((var.region))
+          subnetwork_self_link: ((module.network.subnetwork_self_link))
+          zone: ((var.zone))
+      - source: community/modules/scheduler/schedmd-slurm-gcp-v6-controller
+        kind: terraform
+        id: slurm_controller
+        use:
+          - network
+          - hpc_partition
+          - sharedstg
+          - slurm_login
+        settings:
+          deployment_name: ((var.deployment_name))
+          enable_controller_public_ips: false
+          labels: ((var.labels))
+          login_nodes: ((flatten([module.slurm_login.login_nodes])))
+          machine_type: n2-standard-4
+          network_storage: ((flatten([module.sharedstg.network_storage])))
+          nodeset: ((flatten([module.hpc_partition.nodeset])))
+          nodeset_dyn: ((flatten([module.hpc_partition.nodeset_dyn])))
+          nodeset_tpu: ((flatten([module.hpc_partition.nodeset_tpu])))
+          partitions: ((flatten([module.hpc_partition.partitions])))
+          project_id: ((var.project_id))
+          region: ((var.region))
+          subnetwork_self_link: ((module.network.subnetwork_self_link))
+          zone: ((var.zone))

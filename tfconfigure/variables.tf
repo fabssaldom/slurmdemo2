@@ -22,3 +22,7 @@ variable "constrains" {
   description = "Disable Argolis policies on the project"
   type        = list(string)
 }
+
+variable "clustersa" {
+  description = "Compute SA"
+}
